@@ -1,0 +1,71 @@
+import numpy as np
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import initializers
+
+class GhostMemorySystem:
+    def __init__(self):
+        self.task_library = {}
+
+    def create_model(self, input_dim=2):
+        """Creates a base neural network model."""
+        model = Sequential([
+            Dense(16, activation='relu', input_shape=(input_dim,),
+                  kernel_initializer=initializers.RandomNormal(mean=0., stddev=1.)),
+            Dense(16, activation='relu', kernel_initializer=initializers.RandomNormal(mean=0., stddev=1.)),
+            Dense(1, activation='sigmoid', kernel_initializer=initializers.RandomNormal(mean=0., stddev=1.))
+        ])
+        model.compile(optimizer=Adam(learning_rate=0.01), loss='binary_crossentropy', metrics=['accuracy'])
+        return model
+
+    def train_task(self, task_name, X_train, y_train, epochs=10, batch_size=32):
+        """Trains a model on a specific task and stores the weights."""
+        print(f"Training model for task: {task_name}")
+        model = self.create_model(input_dim=X_train.shape[1])
+        model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=0)
+        self.task_library[task_name] = [layer.get_weights() for layer in model.layers]
+        print(f"Task {task_name} training complete and weights saved.")
+
+    def inject_weights(self, model, task_name):
+        """Injects weights for a specific task into the given model."""
+        if task_name not in self.task_library:
+            raise ValueError(f"Task {task_name} not found in library. Train it first.")
+        print(f"Injecting weights for task: {task_name}")
+        task_weights = self.task_library[task_name]
+        for i, layer in enumerate(model.layers):
+            if len(task_weights[i]) > 0:  # Skip layers without weights
+                layer.set_weights(task_weights[i])
+        print(f"Weights for task {task_name} successfully injected.")
+
+    def evaluate_task(self, model, X_test, y_test):
+        """Evaluates the model on the given test data."""
+        _, accuracy = model.evaluate(X_test, y_test, verbose=0)
+        return accuracy
+
+    def list_tasks(self):
+        """Lists all tasks available in the library."""
+        return list(self.task_library.keys())
+
+# Example usage (to be run separately):
+# system = GhostMemorySystem()
+# 
+# # Train on multiple tasks
+# system.train_task("Task A", X_train_taskA, y_train_taskA)
+# system.train_task("Task B", X_train_taskB, y_train_taskB)
+# system.train_task("Task C", X_train_taskC, y_train_taskC)
+# 
+# # Use the same base model to switch between tasks
+# model = system.create_model()
+# 
+# system.inject_weights(model, "Task A")
+# accuracy_a = system.evaluate_task(model, X_test_taskA, y_test_taskA)
+# print(f"Task A Accuracy: {accuracy_a}")
+# 
+# system.inject_weights(model, "Task B")
+# accuracy_b = system.evaluate_task(model, X_test_taskB, y_test_taskB)
+# print(f"Task B Accuracy: {accuracy_b}")
+# 
+# system.inject_weights(model, "Task C")
+# accuracy_c = system.evaluate_task(model, X_test_taskC, y_test_taskC)
+# print(f"Task C Accuracy: {accuracy_c}")
